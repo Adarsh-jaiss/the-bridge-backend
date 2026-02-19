@@ -2,11 +2,19 @@ package utils
 
 import "github.com/gin-gonic/gin"
 
+// type APIResponse struct {
+// 	Success bool      `json:"success"`
+// 	Data    any       `json:"data"`
+// 	Error   *APIError `json:"error"`
+// }
 
+type SuccessResponse struct {
+	Success bool `json:"success" example:"true"`
+	Data    any  `json:"data"`
+}
 
-type APIResponse struct {
-	Success bool      `json:"success"`
-	Data    any       `json:"data"`
+type ErrorResponse struct {
+	Success bool      `json:"success" example:"false"`
 	Error   *APIError `json:"error"`
 }
 
@@ -16,15 +24,14 @@ type APIError struct {
 }
 
 func JSONSuccess(c *gin.Context, status int, data any) {
-	c.JSON(status, APIResponse{
+	c.JSON(status, SuccessResponse{
 		Success: true,
 		Data:    data,
-		Error:   nil,
 	})
 }
 
 func JSONError(c *gin.Context, status int, code, message string) {
-	c.JSON(status, APIResponse{
+	c.JSON(status, ErrorResponse{
 		Success: false,
 		Error: &APIError{
 			Code:    code,
