@@ -1,30 +1,27 @@
 version: "3.9"
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: mysql-db
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-db
     restart: unless-stopped
 
     ports:
-      - "3306:3306"
+      - "5432:5432"
 
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: app_db
-      MYSQL_USER: app_user
-      MYSQL_PASSWORD: app_password
+      POSTGRES_DB: the_bridge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rootpassword
 
     volumes:
-      - mysql_data:/var/lib/mysql
-
-    command: --default-authentication-plugin=mysql_native_password
+      - postgres_data:/var/lib/postgresql/data
 
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  mysql_data:
+  postgres_data:
