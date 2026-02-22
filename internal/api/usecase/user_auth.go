@@ -69,9 +69,9 @@ func (u *userAuthInteractor) TriggerOTP(ctx context.Context, email string) error
 
 	emailConfig := service.EmailRequest{
 		To:           []string{email},
-		Subject:      "Your The Bridge verification code",
+		Subject:      "Your Verification Code for Signing in to Your The Bridge Account",
 		HTMLTemplate: service.OTPTemplate(otp),
-		ReplyTo:      "",
+		ReplyTo:      "trybridgeee@gmail.com",
 	}
 
 	_, err = service.SendEmail(ctx, emailConfig)
