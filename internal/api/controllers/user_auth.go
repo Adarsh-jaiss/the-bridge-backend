@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"strconv"
+
 	"github.com/adarsh-jaiss/the-bridge/internal/api/types/dto"
 	"github.com/adarsh-jaiss/the-bridge/internal/api/usecase"
 
@@ -49,7 +51,7 @@ func (a *UserAuthController) TriggerOtp(c *gin.Context) {
 	}
 	if err := a.IAuthInteractor.TriggerOTP(ctx, req.Email); err != nil {
 		log.Error("error sending otp", zap.Error(err))
-		c.Error(err)
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "failed to trigger otp")
 		return
 	}
 
@@ -90,9 +92,31 @@ func (a *UserAuthController) VerifyOTP(c *gin.Context) {
 	}
 	tokens, err := a.IAuthInteractor.VerifyOTP(ctx, req)
 	if err != nil {
-		c.Error(err)
+		log.Error("error verifying otp", zap.Error(err))
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "failed to verify otp")
 		return
 	}
 
+	utils.JSONSuccess(c, 200, tokens)
+}
+
+
+// GenerateDummyTokens godoc
+// @Summary Generate dummy tokens
+// @Description Generates dummy access and refresh tokens for a given user ID (for testing purposes)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param user_id query int true "User ID"
+// @Success 200 {object} utils.SuccessResponse{data=dto.OTPVerificationResponse}
+// @Failure 500 {object} utils.ErrorResponse "Internal server error"
+// @Router /v1/auth/dummy-tokens [get]
+func (a *UserAuthController) GenerateDummyTokens(c *gin.Context) {
+	userId, _ := strconv.Atoi(c.Query("user_id"))
+	tokens, err := a.IAuthInteractor.GenerateDummyTokens(int64(userId))
+	if err != nil {
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "failed to verify otp")
+		return
+	}
 	utils.JSONSuccess(c, 200, tokens)
 }

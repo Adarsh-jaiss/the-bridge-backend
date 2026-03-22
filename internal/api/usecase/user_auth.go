@@ -20,6 +20,7 @@ import (
 type IUserAuthInteractor interface {
 	TriggerOTP(ctx context.Context, email string) error
 	VerifyOTP(ctx context.Context, req dto.OTPVerificationRequest) (*dto.OTPVerificationResponse, error)
+	GenerateDummyTokens(userId int64) (*dto.OTPVerificationResponse, error)
 }
 
 type userAuthInteractor struct {
@@ -104,19 +105,21 @@ func (u *userAuthInteractor) VerifyOTP(ctx context.Context, req dto.OTPVerificat
 
 	userId, err := u.repo.FindUserByEmail(ctx, req.Email)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			userId, err = u.repo.CreateUser(ctx, req.Email)
-			if err != nil {
-				log.Error("error creating user", zap.Error(err))
-				return nil, err
-			}
+		if !errors.Is(err, sql.ErrNoRows) {
+			log.Error("database error while finding user",
+				zap.String("email", req.Email),
+				zap.Error(err),
+			)
+			return nil, err
 		}
-		log.Error("database error while finding user",
-			zap.String("email", req.Email),
-			zap.Error(err),
-		)
-		return nil, err
+		// New user — create them
+		userId, err = u.repo.CreateUser(ctx, req.Email)
+		if err != nil {
+			log.Error("error creating user", zap.Error(err))
+			return nil, err
+		}
 	}
+	// Reaches here for both existing AND newly created users ✅
 
 	accessToken, err := auth.GenerateToken(userId, auth.AccessToken)
 	if err != nil {
@@ -124,12 +127,28 @@ func (u *userAuthInteractor) VerifyOTP(ctx context.Context, req dto.OTPVerificat
 		return nil, err
 	}
 
-	refreshToken, err := auth.GenerateToken(userId, auth.AccessToken)
+	refreshToken, err := auth.GenerateToken(userId, auth.RefreshToken)
 	if err != nil {
 		log.Error("error generating refresh token", zap.Error(err))
 		return nil, err
 	}
 
+	return &dto.OTPVerificationResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+func (u *userAuthInteractor) GenerateDummyTokens(userId int64) (*dto.OTPVerificationResponse, error) {
+	accessToken, err := auth.GenerateToken(userId, auth.AccessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := auth.GenerateToken(userId, auth.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
 	return &dto.OTPVerificationResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,

@@ -19,6 +19,104 @@ definitions:
       refresh_token:
         type: string
     type: object
+  dto.Post:
+    properties:
+      attachments:
+        description: list of images/video url's
+        items:
+          type: string
+        type: array
+      bookmarks:
+        format: int64
+        type: integer
+      comments:
+        format: int64
+        type: integer
+      content:
+        description: text content of the post
+        type: string
+      createdAt:
+        type: string
+      id:
+        format: int64
+        type: integer
+      likes:
+        format: int64
+        type: integer
+      reposts:
+        format: int64
+        type: integer
+    type: object
+  dto.UpdateBioAndProfilePic:
+    properties:
+      bio:
+        type: string
+      profile_picture:
+        type: string
+    type: object
+  dto.User:
+    properties:
+      company_name:
+        maxLength: 1000
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      licence:
+        type: string
+      licence_number:
+        type: string
+      licence_type:
+        type: string
+      rank:
+        type: string
+      seman_book:
+        type: string
+    required:
+    - company_name
+    - first_name
+    - last_name
+    - licence
+    - licence_number
+    - licence_type
+    - rank
+    - seman_book
+    type: object
+  dto.UserProfile:
+    properties:
+      bio:
+        type: string
+      firstName:
+        type: string
+      followersCount:
+        format: int64
+        type: integer
+      followingCount:
+        format: int64
+        type: integer
+      lastName:
+        type: string
+      posts:
+        items:
+          $ref: '#/definitions/dto.Post'
+        type: array
+      profilePicture:
+        type: string
+      rank:
+        type: string
+      totalPostCount:
+        format: int64
+        type: integer
+    type: object
+  dto.UserProfileResponse:
+    properties:
+      cursor:
+        format: int64
+        type: integer
+      userProfile:
+        $ref: '#/definitions/dto.UserProfile'
+    type: object
   utils.APIError:
     properties:
       code:
@@ -48,6 +146,37 @@ info:
   title: The Bridge API
   version: "1.0"
 paths:
+  /v1/auth/dummy-tokens:
+    get:
+      consumes:
+      - application/json
+      description: Generates dummy access and refresh tokens for a given user ID (for
+        testing purposes)
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.OTPVerificationResponse'
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Generate dummy tokens
+      tags:
+      - auth
   /v1/auth/trigger-otp:
     post:
       consumes:
@@ -132,6 +261,189 @@ paths:
       summary: Verify OTP
       tags:
       - auth
+  /v1/user/{id}/follow:
+    post:
+      consumes:
+      - application/json
+      description: Follows a user
+      parameters:
+      - description: Followee user ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Invalid or missing followee ID
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized - user_id not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Follows a user
+      tags:
+      - user
+  /v1/user/{id}/unfollow:
+    delete:
+      consumes:
+      - application/json
+      description: Unfollow a user by user ID
+      parameters:
+      - description: Followee user ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Invalid or missing followee ID
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized - user_id not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unfollow a user
+      tags:
+      - user
+  /v1/user/onboarding:
+    post:
+      consumes:
+      - application/json
+      description: Creates a user profile for the authenticated user
+      parameters:
+      - description: User Profile Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Invalid request body or missing required fields
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized - user_id not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create User Profile
+      tags:
+      - user
+  /v1/user/profile:
+    get:
+      consumes:
+      - application/json
+      description: Fetches the authenticated user's profile along with paginated posts
+        (cursor-based)
+      parameters:
+      - description: Number of items to fetch
+        in: query
+        name: limit
+        required: true
+        type: integer
+      - description: Cursor for pagination (last seen ID)
+        in: query
+        name: cursor
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserProfileResponse'
+              type: object
+        "401":
+          description: Unauthorized - user_id not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - user
+    patch:
+      consumes:
+      - application/json
+      description: Update user's bio and profile picture
+      parameters:
+      - description: Update profile payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateBioAndProfilePic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.SuccessResponse'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized - user_id not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - user
 securityDefinitions:
   BearerAuth:
     in: header
