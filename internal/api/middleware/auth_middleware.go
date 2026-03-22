@@ -20,8 +20,9 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			log.Warn("auth header is empty")
+			log.Warn("auth header is empty", zap.Any("error", "authMiddleware"))
 			c.Error(utils.NewUnauthorizedError("missing authorization header"))
+			c.Abort()
 			return
 		}
 
@@ -29,6 +30,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		if tokenStr == authHeader {
 			log.Warn("invalid authorization format")
 			c.Error(utils.NewUnauthorizedError("invalid authorization format"))
+			c.Abort()
 			return
 		}
 
@@ -43,7 +45,8 @@ func AuthMiddleware() gin.HandlerFunc {
 			refreshToken, err := c.Cookie("refresh_token")
 			if err != nil {
 				log.Error("refresh token missing in cookie")
-				c.Error(utils.NewUnauthorizedError("refresh token is missing"))
+				c.Error(utils.NewUnauthorizedError("access token is expired and refresh token is missing"))
+				c.Abort()
 				return
 			}
 
@@ -51,6 +54,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			if err != nil {
 				log.Warn("invalid refresh token")
 				c.Error(utils.NewUnauthorizedError("invalid refresh token"))
+				c.Abort()
 				return
 			}
 			if refreshClaims.ExpiresAt == nil {
@@ -63,6 +67,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			if err != nil {
 				log.Error("error generating new access token", zap.Error(err))
 				c.Error(utils.NewInternalServerError(err))
+				c.Abort()
 				return
 			}
 
@@ -74,6 +79,7 @@ func AuthMiddleware() gin.HandlerFunc {
 				if err != nil {
 					log.Error("error generating new refresh token", zap.Error(err))
 					c.Error(utils.NewInternalServerError(err))
+					c.Abort()
 					return
 				}
 
@@ -89,6 +95,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		log.Warn("invalid access token", zap.Error(err))
 		c.Error(utils.NewUnauthorizedError("invalid access token"))
+		c.Abort()
 
 	}
 }

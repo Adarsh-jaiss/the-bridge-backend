@@ -7,6 +7,31 @@ brew install make
 
 ```
 
+# Todos :
+
+[] Add a seperate api for image upload, which will be called by fronted and then it will take the res (image url) and send to actual api
+
+
+# TEMP :
+
+```
+
+-- Check if A follows B (O(1) PK lookup)
+SELECT 1 FROM user_follows WHERE follower_id = $1 AND followee_id = $2;
+
+-- Get all followers of a user
+SELECT follower_id FROM user_follows WHERE followee_id = $1;
+
+-- Mutual follows (people you follow who also follow you back)
+SELECT follower_id FROM user_follows
+WHERE followee_id = $me
+  AND follower_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $me);
+
+```
+
+
+
+
 ## Developer Resources
 
 - [Golang-Migrate](https://dev.to/wiliamvj/using-migrations-with-golang-3449)
@@ -63,5 +88,3 @@ right now we don't have these features, but they are important for a secure and 
 2. Logout-all-devices
 3. Immediate refresh revocation
 4. Stolen refresh detection
-
-2. 

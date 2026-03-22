@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -12,16 +13,36 @@ type contextKey struct{}
 func InitLogger(env string) (*zap.Logger, zap.AtomicLevel, error) {
 	level := zap.NewAtomicLevelAt(zap.InfoLevel)
 
+	var config zap.Config
+
 	if env == "development" {
+		config = zap.NewDevelopmentConfig()
 		level.SetLevel(zap.DebugLevel)
+
+		// Pretty logs
+		config.Encoding = "console"
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	} else {
+		config = zap.NewProductionConfig()
+		config.Encoding = "json"
 	}
 
-	config := zap.NewProductionConfig()
-	config.Level = level
+	// Clean timestamp
 	config.EncoderConfig.TimeKey = "timestamp"
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Format("2006-01-02 15:04:05"))
+	}
 
-	logger, err := config.Build(zap.AddCaller(),zap.AddCallerSkip(1))
+	// Clean caller
+	config.EncoderConfig.CallerKey = "caller"
+	config.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+
+	//  Disable default stacktrace
+	config.DisableStacktrace = true
+
+	logger, err := config.Build(
+		zap.AddCaller(),
+		zap.AddStacktrace(zap.PanicLevel))
 	return logger, level, err
 }
 

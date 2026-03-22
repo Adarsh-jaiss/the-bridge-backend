@@ -25,6 +25,10 @@ func Routes(db *sql.DB, log *zap.Logger, atomicLevel zap.AtomicLevel, cfg *confi
 	authInteractor := usecase.NewUserAuthInteractor(authrepo)
 	authController := controllers.NewUserAuthController(authInteractor)
 
+	profileRepo := repository.NewUserProfile(db)
+	profileInteractor := usecase.NewUserProfileInteractor(profileRepo)
+	userProfileController := controllers.NewUserProfileController(profileInteractor)
+
 	r := gin.Default()
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		customValidator.RegisterOnValidator(v)
@@ -51,12 +55,17 @@ func Routes(db *sql.DB, log *zap.Logger, atomicLevel zap.AtomicLevel, cfg *confi
 	auth := v1.Group("auth")
 	auth.POST("/trigger-otp", authController.TriggerOtp)
 	auth.POST("/verify-otp", authController.VerifyOTP)
+	auth.GET("/dummy-tokens",authController.GenerateDummyTokens)
 
 	protected := v1.Group("")
 	protected.Use(middleware.AuthMiddleware())
 
 	user := protected.Group("user")
-	user.POST("/onboarding",)
+	user.POST("/onboarding", userProfileController.CreateProfile)
+	user.POST("/:id/follow", userProfileController.Follow)
+	user.DELETE("/:id/unfollow", userProfileController.UnFollow)
+	user.PATCH("/profile", userProfileController.UpdateProfile)
+	user.GET("/profile", userProfileController.GetUserProfile)
 
 	r.Run()
 }

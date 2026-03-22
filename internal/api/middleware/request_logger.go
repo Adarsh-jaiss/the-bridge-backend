@@ -22,7 +22,6 @@ func RequestLogger(baseLogger *zap.Logger) gin.HandlerFunc {
 			zap.String("request_id", requestId),
 			zap.String("path", c.FullPath()),
 			zap.String("method", c.Request.Method),
-			zap.String("client_ip", c.ClientIP()),
 		)
 
 		//store in context
