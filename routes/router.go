@@ -34,7 +34,7 @@ func Routes(db *sql.DB, log *zap.Logger, atomicLevel zap.AtomicLevel, cfg *confi
 		customValidator.RegisterOnValidator(v)
 	}
 
-	api := r.Group("api")
+	api := r.Group("/api")
 	api.Use(middleware.ErrorHandler())
 	api.Use(middleware.RequestLogger(log))
 
@@ -50,12 +50,12 @@ func Routes(db *sql.DB, log *zap.Logger, atomicLevel zap.AtomicLevel, cfg *confi
 	// admin.Use(middleware.AdminAuth()) // protect this
 	admin.POST("/log-level", ChangeLogLevel(atomicLevel, log))
 
-	v1 := api.Group("v1")
+	v1 := api.Group("/v1")
 
 	auth := v1.Group("auth")
 	auth.POST("/trigger-otp", authController.TriggerOtp)
 	auth.POST("/verify-otp", authController.VerifyOTP)
-	auth.GET("/dummy-tokens",authController.GenerateDummyTokens)
+	auth.GET("/dummy-tokens", authController.GenerateDummyTokens)
 
 	protected := v1.Group("")
 	protected.Use(middleware.AuthMiddleware())
@@ -66,6 +66,8 @@ func Routes(db *sql.DB, log *zap.Logger, atomicLevel zap.AtomicLevel, cfg *confi
 	user.DELETE("/:id/unfollow", userProfileController.UnFollow)
 	user.PATCH("/profile", userProfileController.UpdateProfile)
 	user.GET("/profile", userProfileController.GetUserProfile)
+	user.POST("/search", userProfileController.SearchUser)
+	user.GET("/search/:id", userProfileController.GetUserById)
 
 	r.Run()
 }
