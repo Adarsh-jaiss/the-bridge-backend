@@ -28,11 +28,20 @@ type UserProfile struct {
 
 type Post struct {
 	ID          int64
-	Content     *string   // text content of the post
+	Content     *string  // text content of the post
 	Attachments []string // list of images/video url's
 	Likes       int64
 	Comments    int64
 	Reposts     int64
 	Bookmarks   int64
 	CreatedAt   time.Time
+}
+
+type UserSearchResult struct {
+	ID             int64
+	FirstName      string
+	LastName       string
+	ProfilePicture *string
+	Rank           string
+	CompanyName    *string
 }

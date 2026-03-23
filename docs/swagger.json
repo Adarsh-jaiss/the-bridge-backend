@@ -283,14 +283,14 @@
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Number of items to fetch",
+                        "description": "Number of posts to fetch",
                         "name": "limit",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "integer",
-                        "description": "Cursor for pagination (last seen ID)",
+                        "description": "Cursor for pagination (last seen ID) for posts",
                         "name": "cursor",
                         "in": "query",
                         "required": true
@@ -372,6 +372,123 @@
                     },
                     "401": {
                         "description": "Unauthorized - user_id not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/user/search": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search users based on optional filters like name, rank, and company",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search-user"
+                ],
+                "summary": "Search users",
+                "parameters": [
+                    {
+                        "description": "Search filters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SearchUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.SearchUserResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/user/search/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Fetch a user profile by user ID with pagination support for posts",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search-user"
+                ],
+                "summary": "Get user profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit for posts to fetch at once",
+                        "name": "limit",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Cursor for pagination to fetch posts",
+                        "name": "cursor",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID",
                         "schema": {
                             "$ref": "#/definitions/utils.ErrorResponse"
                         }
@@ -566,6 +683,43 @@
                 }
             }
         },
+        "dto.SearchUserRequest": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SearchUserResponse": {
+            "type": "object",
+            "properties": {
+                "company_name": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "profile_picture": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.UpdateBioAndProfilePic": {
             "type": "object",
             "properties": {
@@ -626,13 +780,11 @@
                 "firstName": {
                     "type": "string"
                 },
-                "followersCount": {
-                    "type": "integer",
-                    "format": "int64"
+                "followers_count": {
+                    "type": "integer"
                 },
-                "followingCount": {
-                    "type": "integer",
-                    "format": "int64"
+                "following_count": {
+                    "type": "integer"
                 },
                 "lastName": {
                     "type": "string"
@@ -643,15 +795,14 @@
                         "$ref": "#/definitions/dto.Post"
                     }
                 },
-                "profilePicture": {
+                "profile_picture": {
                     "type": "string"
                 },
                 "rank": {
                     "type": "string"
                 },
-                "totalPostCount": {
-                    "type": "integer",
-                    "format": "int64"
+                "total_post_count": {
+                    "type": "integer"
                 }
             }
         },
@@ -659,10 +810,9 @@
             "type": "object",
             "properties": {
                 "cursor": {
-                    "type": "integer",
-                    "format": "int64"
+                    "type": "integer"
                 },
-                "userProfile": {
+                "user_profile": {
                     "$ref": "#/definitions/dto.UserProfile"
                 }
             }

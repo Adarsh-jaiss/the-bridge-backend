@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/adarsh-jaiss/the-bridge/internal/api/repository"
+	"github.com/adarsh-jaiss/the-bridge/internal/api/types/domain"
 	"github.com/adarsh-jaiss/the-bridge/internal/api/types/dto"
 	"github.com/adarsh-jaiss/the-bridge/internal/api/types/models"
 	"github.com/adarsh-jaiss/the-bridge/pkg/logger"
@@ -16,6 +17,7 @@ type IUserProfileInteractor interface {
 	FollowAndUnfollow(ctx context.Context, IsUnfollowReq bool, followeeID, followerID int64) error
 	UpdateBioAndProfilePic(ctx context.Context, req dto.UpdateBioAndProfilePic, userID int64) error
 	FetchUserProfile(ctx context.Context, limit, cursor, userID int64) (*dto.UserProfileResponse, error)
+	SearchUser(ctx context.Context, req dto.SearchUserRequest) ([]dto.SearchUserResponse, error)
 }
 
 type userProfileInteractor struct {
@@ -26,6 +28,13 @@ func NewUserProfileInteractor(r repository.UserProfile) IUserProfileInteractor {
 	return &userProfileInteractor{
 		repo: r,
 	}
+}
+
+func safeString(ptr *string) string {
+	if ptr != nil {
+		return *ptr
+	}
+	return ""
 }
 
 func (u *userProfileInteractor) CreateProfile(ctx context.Context, userID int64, user dto.User) error {
@@ -136,4 +145,46 @@ func (u *userProfileInteractor) FetchUserProfile(ctx context.Context, limit, cur
 	}
 
 	return &profile, nil
+}
+
+func (u *userProfileInteractor) SearchUser(ctx context.Context, req dto.SearchUserRequest) ([]dto.SearchUserResponse, error) {
+	log := logger.FromContext(ctx)
+	var s domain.UserSearch
+	if req.Name != nil {
+		s.Name = *req.Name
+	} else {
+		s.Name = ""
+	}
+
+	if req.Rank != nil {
+		s.Rank = *req.Rank
+	} else {
+		s.Rank = ""
+	}
+
+	if req.Company != nil {
+		s.Company = *req.Company
+	} else {
+		s.Company = ""
+	}
+
+	users, err := u.repo.SearchUsers(ctx, s.Name, s.Rank, s.Company)
+	if err != nil {
+		log.Error("failed to search users", zap.Error(err))
+		return nil, err
+	}
+
+	var res []dto.SearchUserResponse
+	for _, user := range users {
+		res = append(res, dto.SearchUserResponse{
+			ID:             user.ID,
+			FirstName:      user.FirstName,
+			LastName:       user.LastName,
+			ProfilePicture: safeString(user.ProfilePicture),
+			Rank:           user.Rank,
+			CompanyName:    safeString(user.CompanyName),
+		})
+	}
+
+	return res, nil
 }

@@ -258,8 +258,8 @@ func (u *UserProfileController) UpdateProfile(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param limit query int true "Number of items to fetch"
-// @Param cursor query int true "Cursor for pagination (last seen ID)"
+// @Param limit query int true "Number of posts to fetch"
+// @Param cursor query int true "Cursor for pagination (last seen ID) for posts"
 // @Success 200 {object} utils.SuccessResponse{data=dto.UserProfileResponse}
 // @Failure 401 {object} utils.ErrorResponse "Unauthorized - user_id not found"
 // @Failure 500 {object} utils.ErrorResponse "Internal server error"
@@ -304,4 +304,92 @@ func (u *UserProfileController) GetUserProfile(c *gin.Context) {
 
 	utils.JSONSuccess(c, 200, profile)
 
+}
+
+// SearchUser godoc
+// @Summary      Search users
+// @Description  Search users based on optional filters like name, rank, and company
+// @Tags         search-user
+// @Accept       json
+// @Produce      json
+// @Security BearerAuth
+// @Param        request  body      dto.SearchUserRequest  true  "Search filters"
+// @Success      200      {array}   dto.SearchUserResponse
+// @Failure      400      {object}  utils.ErrorResponse "Invalid request body"
+// @Failure      500      {object}  utils.ErrorResponse "Internal server error"
+// @Router       /v1/user/search [post]
+func (u *UserProfileController) SearchUser(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromContext(ctx)
+
+	var params dto.SearchUserRequest
+	if err := c.ShouldBindJSON(&params); err != nil {
+		log.Error("invalid request body", zap.Error(err))
+		utils.JSONError(c, 400, "ERROR_BAD_REQUEST", "invalid request body")
+		return
+	}
+
+	log.Info("user search request received",
+		zap.Any("request_body", params),
+	)
+
+	searchResults, err := u.IUserProfileInteractor.SearchUser(ctx, params)
+	if err != nil {
+		log.Error("failed to fetch search results", zap.Error(err))
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "failed to search users")
+		return
+	}
+
+	utils.JSONSuccess(c, 200, searchResults)
+}
+
+// GetUserById godoc
+// @Summary      Get user profile
+// @Description  Fetch a user profile by user ID with pagination support for posts
+// @Tags         search-user
+// @Accept       json
+// @Produce      json
+// @Security BearerAuth
+// @Param        id      path      int  true   "User ID"
+// @Param        limit   query     int  true   "Limit for posts to fetch at once"
+// @Param        cursor  query     int  true   "Cursor for pagination to fetch posts"
+// @Success      200     {object}  dto.UserProfileResponse
+// @Failure      400     {object}  utils.ErrorResponse "Invalid user ID"
+// @Failure      500     {object}  utils.ErrorResponse "Internal server error"
+// @Router      /v1/user/search/{id} [get]
+func (u *UserProfileController) GetUserById(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromContext(ctx)
+
+	userID := c.Param("id")
+	userIDInt, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		log.Warn("invalid user id", zap.String("user_id", userID))
+		utils.JSONError(c, 400, "INVALID_USER_ID", "invalid user id")
+		return
+	}
+
+
+	limit, err := strconv.ParseInt(c.Query("limit"), 10, 64)
+	if err != nil {
+		log.Error("error converting limit to int64", zap.Any("limit:", userIDInt))
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "error converting limit to int64")
+		return
+	}
+
+	cursor, err := strconv.ParseInt(c.Query("cursor"), 10, 64)
+	if err != nil {
+		log.Error("error converting cursor to int64", zap.Any("cursor:", userIDInt))
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "error converting cursor to int64")
+		return
+	}
+
+	profile, err := u.IUserProfileInteractor.FetchUserProfile(ctx, limit, cursor, userIDInt)
+	if err != nil {
+		log.Error("failed to fetch user profile", zap.Error(err))
+		utils.JSONError(c, 500, "INTERNAL_SERVER_ERROR", "failed to fetch user profile")
+		return
+	}
+
+	utils.JSONSuccess(c, 200, profile)
 }

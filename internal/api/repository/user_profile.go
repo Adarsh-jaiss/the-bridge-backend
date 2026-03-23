@@ -20,6 +20,7 @@ type UserProfile interface {
 	UpdateBioAndProfilePic(ctx context.Context, bio, profilePicture string, userID int64) error
 	FetchUserProfileSummary(ctx context.Context, userID int64) (*models.UserProfile, error)
 	FetchUserPosts(ctx context.Context, limit, cursor, userID int64) ([]models.Post, int64, error) // int64 is cursor
+	SearchUsers(ctx context.Context, name, rank, company string) ([]models.UserSearchResult, error)
 }
 
 type User struct {
@@ -201,7 +202,7 @@ func (u *User) FetchUserProfileSummary(ctx context.Context, userID int64) (*mode
 		&user.TotalPostCount,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			log.Warn("user dosen't exists",zap.Int64("user_id",userID))
+			log.Warn("user dosen't exists", zap.Int64("user_id", userID))
 			return nil, fmt.Errorf("user don't exists")
 		}
 		log.Error("error fetching user profile summary", zap.Int64("user_id", userID), zap.Error(err))
@@ -265,5 +266,84 @@ func (u *User) FetchUserPosts(ctx context.Context, limit, cursor, userID int64) 
 		nextCursor = posts[len(posts)-1].ID
 	}
 	return posts, nextCursor, nil
+
+}
+
+func (u *User) SearchUsers(ctx context.Context, name, rank, company string) ([]models.UserSearchResult, error) {
+	log := logger.FromContext(ctx)
+
+	query := `SELECT u.id, 
+		u.first_name,
+		u.last_name,
+		u.profile_picture,
+		u.rank,
+		u.company_name
+	FROM users AS u
+	`
+	var conditions []string
+	var args []interface{}
+	argPos := 1
+
+	if rank != "" {
+		conditions = append(conditions, fmt.Sprintf("u.rank = $%d", argPos))
+		args = append(args, rank)
+		argPos++
+	}
+
+	if company != "" {
+		conditions = append(conditions, fmt.Sprintf("u.company_name = $%d", argPos))
+		args = append(args, company)
+		argPos++
+	}
+
+	// Name filter (FULL NAME SEARCH)
+	if name != "" {
+		conditions = append(conditions,
+			fmt.Sprintf("(u.first_name || ' ' || u.last_name) ILIKE '%%' || $%d || '%%'", argPos),
+		)
+		args = append(args, name)
+		argPos++
+	}
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	query += " ORDER BY u.id DESC LIMIT 20"
+
+	rows, err := u.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Warn("user dosen't exists for the search filters", zap.String("rank", rank), zap.String("name", name), zap.String("company", company))
+
+			return nil, fmt.Errorf("no users found for the search filters")
+		}
+		log.Error("error fetching users based on filters", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var searchResult []models.UserSearchResult
+	for rows.Next() {
+		var sr models.UserSearchResult
+		if err := rows.Scan(
+			&sr.ID,
+			&sr.FirstName,
+			&sr.LastName,
+			&sr.ProfilePicture,
+			&sr.Rank,
+			&sr.CompanyName,
+		); err != nil {
+			log.Error("failed to scan rows", zap.Error(err))
+			return nil, err
+		}
+		searchResult = append(searchResult, sr)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Error("row iteration error", zap.Error(err))
+		return nil, err
+	}
+
+	return searchResult, nil
 
 }
