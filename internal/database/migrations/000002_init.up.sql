@@ -1,10 +1,12 @@
 CREATE TABLE posts (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_type TEXT CHECK (post_type IN ('post', 'poll')) NOT NULL,
     content TEXT,
     is_reported BOOLEAN DEFAULT FALSE,
     attachments TEXT[],
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     is_deleted  BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_at  TIMESTAMPTZ,
 
@@ -187,3 +189,105 @@ FOR EACH ROW EXECUTE FUNCTION trg_sync_repost_count();
 
 
 
+-- ==================
+
+CREATE TABLE poll_options (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    post_id     BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    option_text TEXT   NOT NULL,
+    position    SMALLINT NOT NULL,  -- display order (1, 2, 3...)
+
+    CONSTRAINT uq_poll_option_position UNIQUE (post_id, position)
+);
+
+CREATE TABLE poll_votes (
+    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    poll_option_id BIGINT NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
+    user_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    voted_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_user_poll_vote UNIQUE (poll_option_id, user_id)
+    -- prevents a user from voting on the same option twice
+);
+
+CREATE OR REPLACE FUNCTION check_poll_option_post_type()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (SELECT post_type FROM posts WHERE id = NEW.post_id) != 'poll' THEN
+        RAISE EXCEPTION 'poll_options can only be added to posts with post_type = poll';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_poll_options_post_type
+BEFORE INSERT OR UPDATE ON poll_options
+FOR EACH ROW EXECUTE FUNCTION check_poll_option_post_type();
+
+
+-- =============================================
+
+--  Stats per comment (likes count)
+CREATE TABLE comment_stats (
+    comment_id   BIGINT PRIMARY KEY REFERENCES comments(id) ON DELETE CASCADE,
+    likes_count  BIGINT NOT NULL DEFAULT 0
+);
+
+-- Auto-init when a comment is inserted
+CREATE OR REPLACE FUNCTION trg_init_comment_stats()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO comment_stats (comment_id) VALUES (NEW.id)
+    ON CONFLICT DO NOTHING;
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trg_comment_stats_init
+AFTER INSERT ON comments
+FOR EACH ROW EXECUTE FUNCTION trg_init_comment_stats();
+
+
+-- Likes on comments
+CREATE TABLE comment_likes (
+    comment_id BIGINT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+    user_id    BIGINT NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (comment_id, user_id)   -- one like per user per comment
+);
+
+-- Sync likes_count
+CREATE OR REPLACE FUNCTION trg_sync_comment_like_count()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE comment_stats SET likes_count = likes_count + 1 WHERE comment_id = NEW.comment_id;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE comment_stats SET likes_count = likes_count - 1 WHERE comment_id = OLD.comment_id;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trg_comment_like_count
+AFTER INSERT OR DELETE ON comment_likes
+FOR EACH ROW EXECUTE FUNCTION trg_sync_comment_like_count();
+
+
+-- Enforce LinkedIn's 1-Level Nesting Rule for max depth = 1
+CREATE OR REPLACE FUNCTION check_comment_depth()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    -- If replying to a comment, make sure that comment is itself top-level
+    IF NEW.parent_id IS NOT NULL THEN
+        IF (SELECT parent_id FROM comments WHERE id = NEW.parent_id) IS NOT NULL THEN
+            RAISE EXCEPTION 'Replies to replies are not allowed (max depth = 1)';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_comment_depth
+BEFORE INSERT ON comments
+FOR EACH ROW EXECUTE FUNCTION check_comment_depth();

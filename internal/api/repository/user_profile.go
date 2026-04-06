@@ -19,7 +19,7 @@ type UserProfile interface {
 	UnFollow(ctx context.Context, followeeID, followerID int64) error
 	UpdateBioAndProfilePic(ctx context.Context, bio, profilePicture string, userID int64) error
 	FetchUserProfileSummary(ctx context.Context, userID int64) (*models.UserProfile, error)
-	FetchUserPosts(ctx context.Context, limit, cursor, userID int64) ([]models.Post, int64, error) // int64 is cursor
+	FetchUserPosts(ctx context.Context, limit, cursor, userID int64) ([]models.UserPost, int64, error) // int64 is cursor
 	SearchUsers(ctx context.Context, name, rank, company string) ([]models.UserSearchResult, error)
 }
 
@@ -211,7 +211,7 @@ func (u *User) FetchUserProfileSummary(ctx context.Context, userID int64) (*mode
 	return &user, nil
 }
 
-func (u *User) FetchUserPosts(ctx context.Context, limit, cursor, userID int64) ([]models.Post, int64, error) {
+func (u *User) FetchUserPosts(ctx context.Context, limit, cursor, userID int64) ([]models.UserPost, int64, error) {
 	log := logger.FromContext(ctx)
 	query := `SELECT p.id,
 		p.content,
@@ -237,9 +237,9 @@ func (u *User) FetchUserPosts(ctx context.Context, limit, cursor, userID int64) 
 	}
 	defer rows.Close()
 
-	var posts []models.Post
+	var posts []models.UserPost
 	for rows.Next() {
-		var p models.Post
+		var p models.UserPost
 		if err := rows.Scan(
 			&p.ID,
 			&p.Content,

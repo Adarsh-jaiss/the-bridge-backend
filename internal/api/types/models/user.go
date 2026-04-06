@@ -26,7 +26,7 @@ type UserProfile struct {
 	TotalPostCount int64
 }
 
-type Post struct {
+type UserPost struct {
 	ID          int64
 	Content     *string  // text content of the post
 	Attachments []string // list of images/video url's

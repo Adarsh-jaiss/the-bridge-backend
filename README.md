@@ -10,6 +10,12 @@ brew install make
 # Todos :
 
 [] Add a seperate api for image upload, which will be called by fronted and then it will take the res (image url) and send to actual api
+[] implement rate limiting for APIs
+[] implement caching for frequently accessed data (e.g., user profiles, posts)
+[] implement notifications for user interactions (e.g., new followers, likes, comments)
+[] implement ETAGS + cache control headers for better caching and performance
+[] implement gzip for response compression 
+[] **🔑 Idempotency Keys (Safe Retries)**
 
 
 # TEMP :
@@ -26,6 +32,32 @@ SELECT follower_id FROM user_follows WHERE followee_id = $1;
 SELECT follower_id FROM user_follows
 WHERE followee_id = $me
   AND follower_id IN (SELECT followee_id FROM user_follows WHERE follower_id = $me);
+
+
+-- Top-level comments with their reply count and likes
+SELECT 
+    c.id,
+    c.content,
+    c.user_id,
+    c.created_at,
+    cs.likes_count,
+    COUNT(replies.id) AS replies_count
+FROM comments c
+JOIN comment_stats cs ON cs.comment_id = c.id
+LEFT JOIN comments replies ON replies.parent_id = c.id AND replies.is_deleted = FALSE
+WHERE c.post_id = $1
+  AND c.parent_id IS NULL        -- top-level only
+  AND c.is_deleted = FALSE
+GROUP BY c.id, cs.likes_count
+ORDER BY c.created_at ASC;
+
+-- Then fetch replies for a specific comment (on expand)
+SELECT c.*, cs.likes_count
+FROM comments c
+JOIN comment_stats cs ON cs.comment_id = c.id
+WHERE c.parent_id = $comment_id
+  AND c.is_deleted = FALSE
+ORDER BY c.created_at ASC;
 
 ```
 

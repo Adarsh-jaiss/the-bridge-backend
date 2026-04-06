@@ -94,6 +94,7 @@ func (u *userProfileInteractor) UpdateBioAndProfilePic(ctx context.Context, req 
 	return nil
 }
 
+
 func (u *userProfileInteractor) FetchUserProfile(ctx context.Context, limit, cursor, userID int64) (*dto.UserProfileResponse, error) {
 	log := logger.FromContext(ctx)
 	if limit <= 0 {
@@ -103,7 +104,7 @@ func (u *userProfileInteractor) FetchUserProfile(ctx context.Context, limit, cur
 		cursor = 0
 	}
 
-	// TODO : Cache it for 2 mins
+	// TODO : Cache it for 1 min and implement ETAG+cache control
 	user, err := u.repo.FetchUserProfileSummary(ctx, userID)
 	if err != nil {
 		log.Error("failed to fetch user details", zap.Error(err))
